@@ -2,10 +2,183 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dirty boots allright</title>
+    <title>Convert Excel to JSON and Organize Data</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
 </head>
 <body>
-    This is the homepage
+    <h1>Pricing converter</h1>
+    <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" />
+    <button id="processButton">Process Excel</button>
+    <hr>
+    <button id="copyButton" style="display: none;">Copy JSON</button>
+    <br>
+    <button id="downloadOrganizedButton" style="display: none;">Download Organized JSON</button>
+    <br>
+    <div id="jsonOutput"></div>
+    <div id="organizedContent"></div>
+
+    <script>
+        document.getElementById('processButton').addEventListener('click', function() {
+            const fileInput = document.getElementById('excelFile');
+            const jsonOutput = document.getElementById('jsonOutput');
+            const copyButton = document.getElementById('copyButton');
+            const downloadButton = document.getElementById('downloadButton');
+            const downloadOrganizedButton = document.getElementById('downloadOrganizedButton');
+            const organizedContent = document.getElementById('organizedContent');
+
+            const file = fileInput.files[0];
+
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const data = e.target.result;
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    let allSheetData = {};
+
+                    workbook.SheetNames.forEach(function(sheetName) {
+                        const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { raw: false, defval: null });
+
+                        // Convert "october_sms_pricing_values" and "sms_verify_pricing" to floating-point numbers
+                        const decimalData = jsonData.map(row => {
+                            if (!isNaN(row.sms_pricing)) {
+                                row.sms_pricing = parseFloat(row.sms_pricing);
+                            }
+                            if (!isNaN(row.sms_verify_pricing)) {
+                                row.sms_verify_pricing = parseFloat(row.sms_verify_pricing);
+                            }
+                            if (!isNaN(row.verify_plus_pricing)) {
+                                row.verify_plus_pricing = parseFloat(row.verify_plus_pricing);
+                            }
+                            if (!isNaN(row.phone_ID_standard_pricing)) {
+                                row.phone_ID_standard_pricing = parseFloat(row.phone_ID_standard_pricing);
+                            }
+                            if (!isNaN(row.contact_pricing)) {
+                                row.contact_pricing = parseFloat(row.contact_pricing);
+                            }
+                            if (!isNaN(row.intelligence_pricing)) {
+                                row.intelligence_pricing = parseFloat(row.intelligence_pricing);
+                            }
+                            if (!isNaN(row.toll_free_number_setup_pricing)) {
+                                row.toll_free_number_setup_pricing = parseFloat(row.toll_free_number_setup_pricing);
+                            }
+                            if (!isNaN(row.toll_free_number_recurring_pricing)) {
+                                row.toll_free_number_recurring_pricing = parseFloat(row.toll_free_number_recurring_pricing);
+                            }
+                           
+                            return row;
+                        });
+
+                        allSheetData[sheetName] = decimalData;
+                    });
+
+                    copyButton.style.display = 'block';
+
+                    // Organize Data
+                    if (allSheetData.Numbers_and_senders && Array.isArray(allSheetData.Numbers_and_senders)) {
+                        const organizedData = organizeData(allSheetData.Numbers_and_senders);
+                        allSheetData.Numbers_and_senders = organizedData.Numbers_and_senders;
+                        const organizedJsonString = JSON.stringify(allSheetData, null, 2);
+                        organizedContent.innerHTML = '<pre>' + organizedJsonString + '</pre>';
+                        downloadOrganizedButton.style.display = 'block';
+
+                        downloadOrganizedButton.addEventListener('click', function() {
+                            // Create a blob and download link for the organized JSON content
+                            const blob = new Blob([organizedJsonString], { type: 'application/json' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = 'organized_data.json';
+                            a.click();
+                            URL.revokeObjectURL(url);
+                        });
+
+                        copyButton.addEventListener('click', function() {
+                        // Copy JSON to the clipboard
+                        const textArea = document.createElement('textarea');
+                        textArea.value = organizedJsonString;
+                        document.body.appendChild(textArea);
+                        textArea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textArea);
+                        alert('JSON copied to clipboard! Nothing happened');
+                    });
+
+                    } else {
+                        console.error('JSON data should be an object with an array named "Numbers_and_senders".');
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                alert('Please select an Excel or CSV file.');
+            }
+        });
+
+        function organizeData(data) {
+            const organizedData = {
+                Numbers_and_senders: []
+            };
+
+            data.forEach(obj => {
+                const organizedObj = {
+                    country: obj.country,
+                    country_code: obj.country_code,
+                    country_flag: obj.country_flag,
+                    numeric_sender: {
+                        label: obj.numeric_sender_label,
+                        description: obj.numeric_sender_description,
+                        link_1_cta: obj.numeric_sender_link_1_cta,
+                        link_1_url: obj.numeric_sender_link_1_url,
+                    },
+                    dedicated_short_codes: {
+                        label: obj.dedicated_short_codes_label,
+                        description: obj.dedicated_short_codes_description,
+                        link_1_cta: obj.dedicated_short_codes_link_1_cta,
+                        link_1_url: obj.dedicated_short_codes_link_1_url,
+                    },
+                    dedicated_long_codes: {
+                        label: obj.dedicated_long_code_label,
+                        description: obj.dedicated_long_code_description,
+                        setup_pricing: obj.dedicated_long_code_setup_pricing,
+                        recurring_pricing: obj.dedicated_long_code_recurring_pricing,
+                        link_1_cta: obj.dedicated_long_code_link_1_cta,
+                        link_1_url: obj.dedicated_long_code_link_1_url,
+                        link_2_cta: obj.dedicated_long_code_link_2_cta,
+                        link_2_url: obj.dedicated_long_code_link_2_url,
+                    },
+                    alpha_numerics: {
+                        label: obj.alpha_numerics_label,
+                        description: obj.alpha_numerics_description,
+                        link_1_cta: obj.alpha_numerics_link_1_cta,
+                        link_1_url: obj.alpha_numerics_link_1_url,
+                    },
+                    toll_free_number: {
+                        label: obj.toll_free_number_label,
+                        description: obj.toll_free_number_description,
+                        setup_pricing: obj.toll_free_number_setup_pricing,
+                        recurring_pricing: obj.toll_free_number_recurring_pricing,
+                        link_1_cta: obj.toll_free_number_link_1_cta,
+                        link_1_url: obj.toll_free_number_link_1_url,
+                        link_2_cta: obj.toll_free_number_link_2_cta,
+                        link_2_url: obj.toll_free_number_link_2_url
+                    },
+                };
+                if (!isNaN(parseFloat(organizedObj.toll_free_number.setup_pricing)) && isFinite(organizedObj.toll_free_number.setup_pricing)) {
+                    organizedObj.toll_free_number.setup_pricing = '$' + organizedObj.toll_free_number.setup_pricing.toFixed(2) + ' set up fee';
+                    organizedObj.toll_free_number.recurring_pricing = '$' + organizedObj.toll_free_number.recurring_pricing.toFixed(2) + ' monthly fee';
+                }
+                // if (!isNaN(parseFloat(organizedObj.dedicated_long_codes.setup_pricing)) && isFinite(organizedObj.dedicated_long_codes.setup_pricing)) {
+                   if (organizedObj.dedicated_long_codes.setup_pricing !== null) {
+                    const decimalsetUpPrice = parseFloat(organizedObj.dedicated_long_codes.setup_pricing);
+                    const decimalmonthlyPrice = parseFloat(organizedObj.dedicated_long_codes.setup_pricing)
+                    organizedObj.dedicated_long_codes.setup_pricing = '$' + decimalsetUpPrice.toFixed(2) + ' set up fee';
+                    organizedObj.dedicated_long_codes.recurring_pricing = '$' + decimalmonthlyPrice.toFixed(2) + ' monthly fee';
+                }
+    
+                organizedData.Numbers_and_senders.push(organizedObj);
+            });
+
+            return organizedData;
+        }
+    </script>
 </body>
 </html>
